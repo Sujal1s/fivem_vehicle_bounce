@@ -24,12 +24,12 @@ Enjoy 😄
 
 ### Installation
 
-Drag and drop the resource into your server and ensure it. Then you should be good to go. 
+Drag and drop the resource into your server and ensure it.
 
-Use the command:
-```
-/veh_bounce
-```
+you have to pust hash ID of car in both client lua and server lua
+
+after that if you want to change the speed of car while runing you have to change the 
+``` SetVehicleMaxSpeed(vehicle, 4.0)```
 
 And bounce away...
 
