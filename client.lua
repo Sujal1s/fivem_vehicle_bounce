@@ -7,24 +7,12 @@ local is_bounce_mode_active = false
 local bounce_height = 0.0
 local original_height = {}
 local bounce_time = 0
-local radius = 50.0
-local affect_vehicles_in_range = true
 local allowed_vehicle_types = { 0, 1, 2, 3, 4, 5, 6, 7 }
-local enable_headlights = true 
-
---- Enumerate all vehicles
--- @return coroutine wrapping the vehicle enumeration
-local function enumerate_vehicles()
-    return coroutine.wrap(function()
-        local handle, vehicle = FindFirstVehicle()
-        local success
-        repeat
-            coroutine.yield(vehicle)
-            success, vehicle = FindNextVehicle(handle)
-        until not success
-        EndFindVehicle(handle)
-    end)
-end
+local allowed_vehicle_hashes = {
+    [1663218586] = true,  -- Replace with actual hash ID
+    [-394074634] = true   -- Replace with actual hash ID
+}
+local original_speed_limits = {}
 
 --- Check if a table contains a value
 -- @param table table: the table to check
@@ -39,41 +27,6 @@ local function table_contains(table, element)
     return false
 end
 
---- Get vehicles in radius of player
--- @param coords table: coordinates of the center
--- @param radius number: radius to search within
--- @return table: list of vehicles within radius
-local function get_vehicles_in_radius(coords, radius)
-    local vehicles = {}
-    for vehicle in enumerate_vehicles() do
-        if Vdist(coords.x, coords.y, coords.z, GetEntityCoords(vehicle)) < radius then
-            vehicles[#vehicles + 1] = vehicle
-        end
-    end
-    return vehicles
-end
-
---- Toggle bounce for multiple vehicles
--- @param vehicles table: list of vehicles to toggle bounce for
-local function toggle_for_multiple_vehicles(vehicles)
-    is_bounce_mode_active = not is_bounce_mode_active
-    bounce_time = GetGameTimer()
-    for _, vehicle in ipairs(vehicles) do
-        local vehicle_type = GetVehicleClass(vehicle)
-        if table_contains(allowed_vehicle_types, vehicle_type) then
-            if is_bounce_mode_active then
-                original_height[vehicle] = GetVehicleSuspensionHeight(vehicle)
-                SetVehicleLights(vehicle, 2)
-                SetVehicleFullbeam(vehicle, true)
-            else
-                SetVehicleSuspensionHeight(vehicle, original_height[vehicle] or 0)
-                SetVehicleLights(vehicle, 0)
-                SetVehicleFullbeam(vehicle, false)
-            end
-        end
-    end
-end
-
 --- Toggle bounce for single vehicle
 -- @param vehicle number: vehicle ID to toggle bounce for
 local function toggle_for_single_vehicle(vehicle)
@@ -81,32 +34,39 @@ local function toggle_for_single_vehicle(vehicle)
     bounce_time = GetGameTimer()
     if is_bounce_mode_active then
         original_height[vehicle] = GetVehicleSuspensionHeight(vehicle)
+        original_speed_limits[vehicle] = GetVehicleMaxSpeed(vehicle)
         SetVehicleLights(vehicle, 2)
         SetVehicleFullbeam(vehicle, true)
+        SetVehicleMaxSpeed(vehicle, 4.0)
     else
         SetVehicleSuspensionHeight(vehicle, original_height[vehicle] or 0)
         SetVehicleLights(vehicle, 0)
         SetVehicleFullbeam(vehicle, false)
+        SetVehicleMaxSpeed(vehicle, original_speed_limits[vehicle] or GetVehicleHandlingFloat(vehicle, "CHandlingData", "fInitialDriveMaxFlatVel"))
     end
 end
 
 --- Toggle vehicle bounce mode on or off
-local function toggle_vehicle_bounce_mode()
-    local player = PlayerPedId()
-    local coords = GetEntityCoords(player)
-    local vehicle = GetVehiclePedIsIn(player, false)
-    local vehicle_type = GetVehicleClass(vehicle)
-    if affect_vehicles_in_range then
-        local vehicles = get_vehicles_in_radius(coords, radius)
-        toggle_for_multiple_vehicles(vehicles)
-    else
-        if vehicle ~= 0 and table_contains(allowed_vehicle_types, vehicle_type) then
-            toggle_for_single_vehicle(vehicle)
-        end
+local function toggle_vehicle_bounce_mode(veh_netid)
+    local vehicle = NetworkGetEntityFromNetworkId(veh_netid)
+    local vehicle_hash = GetEntityModel(vehicle)
+    if vehicle ~= 0 and allowed_vehicle_hashes[vehicle_hash] then
+        toggle_for_single_vehicle(vehicle)
     end
 end
 
---- @section Threads
+--- Toggle vehicle bounce mode using the keybind
+RegisterCommand('veh_bounce_keybind', function()
+    local player = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(player, false)
+    if vehicle ~= 0 then
+        local veh_netid = NetworkGetNetworkIdFromEntity(vehicle)
+        TriggerServerEvent('vehicle_bouncemode:sv:toggle_bounce', veh_netid)
+    end
+end, false)
+
+--- Register the key mapping for vehicle bounce mode
+RegisterKeyMapping('veh_bounce_keybind', 'Toggle Vehicle Bounce Mode', 'keyboard', 'B')
 
 --- Handles vehicle bouncing.
 CreateThread(function()
@@ -114,23 +74,22 @@ CreateThread(function()
         Wait(0)
         if is_bounce_mode_active then
             local current_time = GetGameTimer()
-            local player = PlayerPedId()
-            local coords = GetEntityCoords(player)
-            local vehicles = get_vehicles_in_radius(coords, radius)
             local time_since_start = (current_time - bounce_time) / 1000.0
             local new_bounce_height = 0.05 * math.sin(2 * math.pi * 1.5 * time_since_start)
             
-            for _, vehicle in ipairs(vehicles) do
-                local vehicle_type = GetVehicleClass(vehicle)
-                if original_height[vehicle] and table_contains(allowed_vehicle_types, vehicle_type) then
-                    SetVehicleSuspensionHeight(vehicle, original_height[vehicle] + new_bounce_height)
-                end
+            for vehicle, height in pairs(original_height) do
+                SetVehicleSuspensionHeight(vehicle, height + new_bounce_height)
             end
         end
     end
 end)
 
---- Triggers event from server to ensure bouncing is synced.
-RegisterNetEvent('vehicle_bouncemode:cl:start_bounce', function()
-    toggle_vehicle_bounce_mode()
+--- Triggers event from server to start bouncing.
+RegisterNetEvent('vehicle_bouncemode:cl:start_bounce', function(veh_netid)
+    toggle_vehicle_bounce_mode(veh_netid)
+end)
+
+--- Triggers event from server to stop bouncing.
+RegisterNetEvent('vehicle_bouncemode:cl:stop_bounce', function(veh_netid)
+    toggle_vehicle_bounce_mode(veh_netid)
 end)
