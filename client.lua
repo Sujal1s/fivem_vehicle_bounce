@@ -9,8 +9,8 @@ local original_height = {}
 local bounce_time = 0
 local allowed_vehicle_types = { 0, 1, 2, 3, 4, 5, 6, 7 }
 local allowed_vehicle_hashes = {
-    [1663218586] = true,  -- Replace with actual hash ID
-    [-394074634] = true   -- Replace with actual hash ID
+    [Hash id ] = true,  -- Replace with actual hash ID
+    [Hash id ] = true   -- Replace with actual hash ID
 }
 local original_speed_limits = {}
 
