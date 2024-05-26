@@ -4,8 +4,8 @@
 --- @section Variables
 local active_bounce_modes = {}
 local allowed_vehicle_hashes = {
-    [1663218586] = true,  -- Replace with actual hash ID
-    [-394074634] = true   -- Replace with actual hash ID
+    [Hash id ] = true,  -- Replace with actual hash ID
+    [Hash id ] = true   -- Replace with actual hash ID
 }
 
 --- @section Local functions
