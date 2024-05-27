@@ -1,4 +1,5 @@
 --- Vehicle bounce mode.
+
 -- @script client/main.lua
 
 --- @section Variables 
@@ -30,6 +31,17 @@ end
 --- Toggle bounce for single vehicle
 -- @param vehicle number: vehicle ID to toggle bounce for
 local function toggle_for_single_vehicle(vehicle)
+    local current_speed = GetEntitySpeed(vehicle) * 3.6 -- Convert m/s to km/h
+    if current_speed > 50 then
+        -- Speed is over 50 km/h, do not activate bounce mode
+        TriggerEvent('chat:addMessage', {
+            color = { 255, 0, 0 },
+            multiline = true,
+            args = {"System", "Cannot activate bounce mode while speed is over 50 km/h."}
+        })
+        return
+    end
+    
     is_bounce_mode_active = not is_bounce_mode_active
     bounce_time = GetGameTimer()
     if is_bounce_mode_active then
